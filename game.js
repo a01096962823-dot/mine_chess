@@ -200,7 +200,7 @@ const MineChess = (() => {
       board[toR][toC] = '';
       logMessage(`${colorName}의 기물이 지뢰를 밟고 폭발했습니다! (${toR}, ${toC})`);
     } else if (target && target[1] === 'K') {
-      logMessage(`${colorName}이(가) 상대 왕을 잡었습니다!`);
+      logMessage(`${colorName}이(가) 상대 킹을 잡었습니다`);
     }
 
     const whiteAlive = isKingAlive(board, 'w');
@@ -208,17 +208,17 @@ const MineChess = (() => {
 
     if (!whiteAlive && !blackAlive) {
       state.gameOver = true;
-      state.elements.statusEl.textContent = '두 왕이 모두 사라졌습니다. 무승부입니다.';
+      state.elements.statusEl.textContent = '무승부입니다.';
       return;
     }
     if (!whiteAlive) {
       state.gameOver = true;
-      state.elements.statusEl.textContent = '백 왕이 사라졌습니다. 흑의 승리!';
+      state.elements.statusEl.textContent = '흑의 승리.';
       return;
     }
     if (!blackAlive) {
       state.gameOver = true;
-      state.elements.statusEl.textContent = '흑 왕이 사라졌습니다. 백의 승리!';
+      state.elements.statusEl.textContent = '백의 승리.';
       return;
     }
 
@@ -348,7 +348,7 @@ const MineChess = (() => {
 
     const { logEl } = state.elements;
     if (logEl) logEl.innerHTML = '';
-    logMessage('새 게임 시작! 보드 전체 칸의 약 10%에 지뢰가 숨어 있습니다...');
+    logMessage('새 게임 시작. 보드 전체 칸의 6개의 지뢰가 숨어 있습니다.');
 
     renderBoard();
     updateStatus();
@@ -373,3 +373,4 @@ const MineChess = (() => {
 document.addEventListener('DOMContentLoaded', () => {
   MineChess.init();
 });
+
