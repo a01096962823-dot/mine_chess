@@ -60,14 +60,35 @@ h1 {
   box-shadow: inset 0 0 0 2px #f57f17;
 }
 
-/* 지뢰 폭발 칸 */
+/* 지뢰 폭발 칸 + 애니메이션 */
 .exploded {
   background: #ff9e9e !important;
+  animation: boomFlash 0.35s ease-out 0s 3;
 }
 
-/* 이동 가능 칸 하이라이트 */
+@keyframes boomFlash {
+  0% {
+    transform: scale(1);
+    filter: none;
+  }
+  50% {
+    transform: scale(1.15);
+    filter: brightness(1.4);
+  }
+  100% {
+    transform: scale(1);
+    filter: none;
+  }
+}
+
+/* 이동 가능한 칸 (빈칸) */
 .highlight-move {
-  box-shadow: inset 0 0 0 3px rgba(0, 255, 0, 0.8);
+  box-shadow: inset 0 0 0 3px rgba(0, 255, 0, 0.85);
+}
+
+/* 잡을 수 있는 칸 (상대 말 있는 칸) */
+.highlight-capture {
+  box-shadow: inset 0 0 0 3px rgba(255, 0, 0, 0.9);
 }
 
 #info {
@@ -108,4 +129,27 @@ button:hover {
 
 #log div {
   margin-bottom: 4px;
+}
+
+/* 폭발 시 위에 뜨는 토스트 메시지 */
+#boomToast {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(255, 80, 80, 0.97);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 9999;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+#boomToast.show-boom {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
