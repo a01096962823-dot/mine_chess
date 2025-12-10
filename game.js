@@ -265,4 +265,157 @@ const MineChess = (() => {
 
   // --- 렌더링 ---
 
-  con
+  const renderBoard = () => {
+    const {
+      board, exploded, selected,
+      highlightedMoves, highlightedCaptures
+    } = state;
+    const { boardEl } = state.elements;
+    boardEl.innerHTML = '';
+
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const cell = document.createElement('div');
+        cell.classList.add('cell');
+        cell.classList.add((r + c) % 2 === 0 ? 'light' : 'dark');
+        cell.dataset.row = r;
+        cell.dataset.col = c;
+
+        const piece = board[r][c];
+        if (piece) {
+          cell.textContent = pieceToChar(piece);
+        }
+
+        if (exploded[r][c]) {
+          cell.classList.add('exploded');
+          cell.textContent = '💥';
+        }
+
+        if (selected && selected.row === r && selected.col === c) {
+          cell.classList.add('selected');
+        }
+
+        if (highlightedMoves.some(m => m.row === r && m.col === c)) {
+          cell.classList.add('highlight-move');
+        }
+        if (highlightedCaptures.some(m => m.row === r && m.col === c)) {
+          cell.classList.add('highlight-capture');
+        }
+
+        boardEl.appendChild(cell);
+      }
+    }
+  };
+
+  // --- 이벤트 처리 ---
+
+  const handleBoardClick = (event) => {
+    if (state.gameOver) return;
+
+    const cell = event.target.closest('.cell');
+    if (!cell) return;
+
+    const r = parseInt(cell.dataset.row, 10);
+    const c = parseInt(cell.dataset.col, 10);
+    const piece = state.board[r][c];
+
+    const { selected, board, whiteTurn } = state;
+
+    // 선택된 말이 없는 상태
+    if (!selected) {
+      if (!piece) return;
+      const color = piece[0];
+      if (whiteTurn && color !== 'w') return;
+      if (!whiteTurn && color !== 'b') return;
+
+      state.selected = { row: r, col: c };
+      const moves = generateMoves(board, r, c);
+      state.highlightedMoves = moves.filter(m => !m.capture);
+      state.highlightedCaptures = moves.filter(m => m.capture);
+      renderBoard();
+      return;
+    }
+
+    // 같은 칸 다시 클릭 → 선택 해제
+    if (selected.row === r && selected.col === c) {
+      state.selected = null;
+      state.highlightedMoves = [];
+      state.highlightedCaptures = [];
+      renderBoard();
+      return;
+    }
+
+    const fromR = selected.row;
+    const fromC = selected.col;
+    const fromPiece = board[fromR][fromC];
+    if (!fromPiece) {
+      state.selected = null;
+      state.highlightedMoves = [];
+      state.highlightedCaptures = [];
+      renderBoard();
+      return;
+    }
+    const fromColor = fromPiece[0];
+
+    // 같은 색 말 있는 칸 클릭 → 선택 말 변경
+    if (piece && piece[0] === fromColor) {
+      state.selected = { row: r, col: c };
+      const moves = generateMoves(board, r, c);
+      state.highlightedMoves = moves.filter(m => !m.capture);
+      state.highlightedCaptures = moves.filter(m => m.capture);
+      renderBoard();
+      return;
+    }
+
+    // 이동 가능한 칸인지 확인
+    const legalMoves = generateMoves(board, fromR, fromC);
+    const isLegal = legalMoves.some(m => m.row === r && m.col === c);
+    if (!isLegal) return;
+
+    makeMove(fromR, fromC, r, c);
+    state.selected = null;
+    state.highlightedMoves = [];
+    state.highlightedCaptures = [];
+    renderBoard();
+  };
+
+  // --- 초기화 ---
+
+  const initState = () => {
+    state.board = cloneBoard(INITIAL_BOARD);
+    state.mines = generateMines();
+    state.exploded = Array.from({ length: 8 }, () => Array(8).fill(false));
+    state.whiteTurn = true;
+    state.selected = null;
+    state.highlightedMoves = [];
+    state.highlightedCaptures = [];
+    state.gameOver = false;
+
+    const { logEl } = state.elements;
+    if (logEl) logEl.innerHTML = '';
+    logMessage('새 게임 시작! 보드 전체 칸의 약 10%에 지뢰가 숨어 있습니다...');
+
+    renderBoard();
+    updateStatus();
+  };
+
+  const init = () => {
+    state.elements.boardEl = document.getElementById('board');
+    state.elements.statusEl = document.getElementById('status');
+    state.elements.logEl = document.getElementById('log');
+    state.elements.resetBtn = document.getElementById('resetBtn');
+    state.elements.boomToast = document.getElementById('boomToast');
+
+    state.elements.boardEl.addEventListener('click', handleBoardClick);
+    state.elements.resetBtn.addEventListener('click', initState);
+
+    initState();
+  };
+
+  return { init };
+})();
+
+// DOM이 준비되면 초기화
+document.addEventListener('DOMContentLoaded', () => {
+  MineChess.init();
+});
