@@ -253,3 +253,130 @@ function renderBoard() {
       cell.classList.add('cell');
       cell.classList.add((r + c) % 2 === 0 ? 'light' : 'dark');
       cell.dataset.row = r;
+      cell.dataset.col = c;
+
+      const piece = board[r][c];
+      if (piece) {
+        cell.textContent = pieceToChar(piece);
+      }
+
+      if (exploded[r][c]) {
+        cell.classList.add('exploded');
+        cell.textContent = '💥';
+      }
+
+      if (selected && selected.row === r && selected.col === c) {
+        cell.classList.add('selected');
+      }
+
+      if (highlightedMoves.some(m => m.row === r && m.col === c)) {
+        cell.classList.add('highlight-move');
+      }
+      if (highlightedCaptures.some(m => m.row === r && m.col === c)) {
+        cell.classList.add('highlight-capture');
+      }
+
+      cell.addEventListener('click', onCellClick);
+      boardEl.appendChild(cell);
+    }
+  }
+}
+
+// === 셀 클릭 처리 ===
+function onCellClick() {
+  if (gameOver) return;
+
+  const r = parseInt(this.dataset.row, 10);
+  const c = parseInt(this.dataset.col, 10);
+  const piece = board[r][c];
+
+  // 아무 것도 선택 안 된 상태
+  if (!selected) {
+    if (!piece) return;
+    const color = piece[0];
+    if (whiteTurn && color !== 'w') return;
+    if (!whiteTurn && color !== 'b') return;
+
+    selected = { row: r, col: c };
+    const moves = generateMoves(board, r, c);
+    highlightedMoves = moves.filter(m => !m.capture);
+    highlightedCaptures = moves.filter(m => m.capture);
+    renderBoard();
+    return;
+  }
+
+  // 같은 칸 다시 클릭 → 선택 해제
+  if (selected.row === r && selected.col === c) {
+    selected = null;
+    highlightedMoves = [];
+    highlightedCaptures = [];
+    renderBoard();
+    return;
+  }
+
+  const fromR = selected.row;
+  const fromC = selected.col;
+  const fromPiece = board[fromR][fromC];
+  if (!fromPiece) {
+    selected = null;
+    highlightedMoves = [];
+    highlightedCaptures = [];
+    renderBoard();
+    return;
+  }
+  const fromColor = fromPiece[0];
+
+  // 같은 색 말이 있는 칸 → 선택 말 변경
+  if (piece && piece[0] === fromColor) {
+    selected = { row: r, col: c };
+    const moves = generateMoves(board, r, c);
+    highlightedMoves = moves.filter(m => !m.capture);
+    highlightedCaptures = moves.filter(m => m.capture);
+    renderBoard();
+    return;
+  }
+
+  // 합법적인 움직임인지 확인
+  const legalMoves = generateMoves(board, fromR, fromC);
+  const isLegal = legalMoves.some(m => m.row === r && m.col === c);
+  if (!isLegal) return;
+
+  makeMove(fromR, fromC, r, c);
+  selected = null;
+  highlightedMoves = [];
+  highlightedCaptures = [];
+  renderBoard();
+}
+
+// === 초기화 ===
+function initGame() {
+  board = cloneBoard(INITIAL_BOARD);
+  mines = generateMines();
+  exploded = Array.from({ length: 8 }, () => Array(8).fill(false));
+  whiteTurn = true;
+  selected = null;
+  highlightedMoves = [];
+  highlightedCaptures = [];
+  gameOver = false;
+
+  if (logEl) logEl.innerHTML = '';
+  logMessage('새 게임 시작! 보드 전체 칸의 약 10%에 지뢰가 숨어 있습니다...');
+
+  renderBoard();
+  updateStatus();
+}
+
+function init() {
+  boardEl = document.getElementById('board');
+  statusEl = document.getElementById('status');
+  logEl = document.getElementById('log');
+  resetBtn = document.getElementById('resetBtn');
+  boomToastEl = document.getElementById('boomToast');
+
+  resetBtn.addEventListener('click', initGame);
+
+  initGame();
+}
+
+// DOM 준비 후 시작
+document.addEventListener('DOMContentLoaded', init);
