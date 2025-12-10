@@ -28,13 +28,16 @@ const MineChess = (() => {
     exploded: null,
     whiteTurn: true,
     selected: null,
-    highlighted: [],
+    highlightedMoves: [],     // 빈칸으로 이동하는 칸
+    highlightedCaptures: [],  // 상대 기물을 잡을 수 있는 칸
     gameOver: false,
+    boomTimer: null,
     elements: {
       boardEl: null,
       statusEl: null,
       logEl: null,
-      resetBtn: null
+      resetBtn: null,
+      boomToast: null
     }
   };
 
@@ -60,6 +63,21 @@ const MineChess = (() => {
     logEl.prepend(div);
   };
 
+  // 화면 상단에 잠깐 뜨는 폭발 토스트
+  const showBoomToast = (message) => {
+    const el = state.elements.boomToast;
+    if (!el) return;
+    el.textContent = message;
+
+    // 기존 타이머 있으면 제거
+    if (state.boomTimer) clearTimeout(state.boomTimer);
+
+    el.classList.add('show-boom');
+    state.boomTimer = setTimeout(() => {
+      el.classList.remove('show-boom');
+    }, 900);
+  };
+
   // --- 지뢰 생성 ---
 
   const generateMines = () => {
@@ -80,7 +98,7 @@ const MineChess = (() => {
   };
 
   // --- 말 이동 가능 칸 계산 ---
-
+  // 각 move: { row, col, capture: boolean }
   const generateMoves = (board, fr, fc) => {
     const moves = [];
     const piece = board[fr][fc];
@@ -95,9 +113,11 @@ const MineChess = (() => {
       while (inBounds(r, c)) {
         const target = board[r][c];
         if (!target) {
-          moves.push({ row: r, col: c });
+          moves.push({ row: r, col: c, capture: false });
         } else {
-          if (target[0] !== color) moves.push({ row: r, col: c });
+          if (target[0] !== color) {
+            moves.push({ row: r, col: c, capture: true });
+          }
           break;
         }
         r += dr;
@@ -110,22 +130,25 @@ const MineChess = (() => {
       const startRow = color === 'w' ? 6 : 1;
       const one = fr + dir;
 
+      // 앞으로 한 칸 (빈칸만)
       if (inBounds(one, fc) && !board[one][fc]) {
-        moves.push({ row: one, col: fc });
+        moves.push({ row: one, col: fc, capture: false });
       }
 
+      // 처음 위치면 두 칸
       const two = fr + 2 * dir;
       if (fr === startRow && inBounds(two, fc) &&
           !board[one][fc] && !board[two][fc]) {
-        moves.push({ row: two, col: fc });
+        moves.push({ row: two, col: fc, capture: false });
       }
 
+      // 대각선 잡기
       const caps = [[dir, -1], [dir, 1]];
       for (const [dr, dc] of caps) {
         const r = fr + dr;
         const c = fc + dc;
         if (inBounds(r, c) && board[r][c] && board[r][c][0] !== color) {
-          moves.push({ row: r, col: c });
+          moves.push({ row: r, col: c, capture: true });
         }
       }
     } else if (type === 'R') {
@@ -157,8 +180,10 @@ const MineChess = (() => {
         const c = fc + dc;
         if (!inBounds(r, c)) continue;
         const target = board[r][c];
-        if (!target || target[0] !== color) {
-          moves.push({ row: r, col: c });
+        if (!target) {
+          moves.push({ row: r, col: c, capture: false });
+        } else if (target[0] !== color) {
+          moves.push({ row: r, col: c, capture: true });
         }
       }
     } else if (type === 'K') {
@@ -172,8 +197,10 @@ const MineChess = (() => {
         const c = fc + dc;
         if (!inBounds(r, c)) continue;
         const target = board[r][c];
-        if (!target || target[0] !== color) {
-          moves.push({ row: r, col: c });
+        if (!target) {
+          moves.push({ row: r, col: c, capture: false });
+        } else if (target[0] !== color) {
+          moves.push({ row: r, col: c, capture: true });
         }
       }
     }
@@ -198,9 +225,13 @@ const MineChess = (() => {
       mines[toR][toC] = false;
       exploded[toR][toC] = true;
       board[toR][toC] = '';
-      logMessage(`${colorName}의 기물이 지뢰를 밟고 폭발했습니다! (${toR}, ${toC})`);
+      const msg = `${colorName}의 기물이 지뢰를 밟고 폭발했습니다! (${toR}, ${toC})`;
+      logMessage('💥 ' + msg);
+      showBoomToast(msg);
     } else if (target && target[1] === 'K') {
-      logMessage(`${colorName}이(가) 상대 킹을 잡었습니다`);
+      const msg = `${colorName}이(가) 상대 왕을 잡었습니다!`;
+      logMessage('♚ ' + msg);
+      showBoomToast(msg);
     }
 
     const whiteAlive = isKingAlive(board, 'w');
@@ -208,17 +239,17 @@ const MineChess = (() => {
 
     if (!whiteAlive && !blackAlive) {
       state.gameOver = true;
-      state.elements.statusEl.textContent = '무승부입니다.';
+      state.elements.statusEl.textContent = '두 왕이 모두 사라졌습니다. 무승부입니다.';
       return;
     }
     if (!whiteAlive) {
       state.gameOver = true;
-      state.elements.statusEl.textContent = '흑의 승리.';
+      state.elements.statusEl.textContent = '백 왕이 사라졌습니다. 흑의 승리!';
       return;
     }
     if (!blackAlive) {
       state.gameOver = true;
-      state.elements.statusEl.textContent = '백의 승리.';
+      state.elements.statusEl.textContent = '흑 왕이 사라졌습니다. 백의 승리!';
       return;
     }
 
@@ -234,143 +265,4 @@ const MineChess = (() => {
 
   // --- 렌더링 ---
 
-  const renderBoard = () => {
-    const { board, exploded, selected, highlighted } = state;
-    const { boardEl } = state.elements;
-    boardEl.innerHTML = '';
-
-    for (let r = 0; r < 8; r++) {
-      for (let c = 0; c < 8; c++) {
-        const cell = document.createElement('div');
-        cell.classList.add('cell');
-        cell.classList.add((r + c) % 2 === 0 ? 'light' : 'dark');
-        cell.dataset.row = r;
-        cell.dataset.col = c;
-
-        const piece = board[r][c];
-        if (piece) {
-          cell.textContent = pieceToChar(piece);
-        }
-
-        if (exploded[r][c]) {
-          cell.classList.add('exploded');
-          cell.textContent = '💥';
-        }
-
-        if (selected && selected.row === r && selected.col === c) {
-          cell.classList.add('selected');
-        }
-
-        if (highlighted.some(m => m.row === r && m.col === c)) {
-          cell.classList.add('highlight-move');
-        }
-
-        boardEl.appendChild(cell);
-      }
-    }
-  };
-
-  // --- 이벤트 처리 ---
-
-  const handleBoardClick = (event) => {
-    if (state.gameOver) return;
-
-    const cell = event.target.closest('.cell');
-    if (!cell) return;
-
-    const r = parseInt(cell.dataset.row, 10);
-    const c = parseInt(cell.dataset.col, 10);
-    const piece = state.board[r][c];
-
-    const { selected, board, whiteTurn } = state;
-
-    // 선택된 말이 없는 상태
-    if (!selected) {
-      if (!piece) return;
-      const color = piece[0];
-      if (whiteTurn && color !== 'w') return;
-      if (!whiteTurn && color !== 'b') return;
-
-      state.selected = { row: r, col: c };
-      state.highlighted = generateMoves(board, r, c);
-      renderBoard();
-      return;
-    }
-
-    // 같은 칸 다시 클릭 → 선택 해제
-    if (selected.row === r && selected.col === c) {
-      state.selected = null;
-      state.highlighted = [];
-      renderBoard();
-      return;
-    }
-
-    const fromR = selected.row;
-    const fromC = selected.col;
-    const fromPiece = board[fromR][fromC];
-    if (!fromPiece) {
-      state.selected = null;
-      state.highlighted = [];
-      renderBoard();
-      return;
-    }
-    const fromColor = fromPiece[0];
-
-    // 같은 색 말 있는 칸 클릭 → 선택 말 변경
-    if (piece && piece[0] === fromColor) {
-      state.selected = { row: r, col: c };
-      state.highlighted = generateMoves(board, r, c);
-      renderBoard();
-      return;
-    }
-
-    // 이동 가능한 칸인지 확인
-    const legalMoves = generateMoves(board, fromR, fromC);
-    const isLegal = legalMoves.some(m => m.row === r && m.col === c);
-    if (!isLegal) return;
-
-    makeMove(fromR, fromC, r, c);
-    state.selected = null;
-    state.highlighted = [];
-    renderBoard();
-  };
-
-  // --- 초기화 ---
-
-  const initState = () => {
-    state.board = cloneBoard(INITIAL_BOARD);
-    state.mines = generateMines();
-    state.exploded = Array.from({ length: 8 }, () => Array(8).fill(false));
-    state.whiteTurn = true;
-    state.selected = null;
-    state.highlighted = [];
-    state.gameOver = false;
-
-    const { logEl } = state.elements;
-    if (logEl) logEl.innerHTML = '';
-    logMessage('새 게임 시작. 보드 전체 칸의 6개의 지뢰가 숨어 있습니다.');
-
-    renderBoard();
-    updateStatus();
-  };
-
-  const init = () => {
-    state.elements.boardEl = document.getElementById('board');
-    state.elements.statusEl = document.getElementById('status');
-    state.elements.logEl = document.getElementById('log');
-    state.elements.resetBtn = document.getElementById('resetBtn');
-
-    state.elements.boardEl.addEventListener('click', handleBoardClick);
-    state.elements.resetBtn.addEventListener('click', initState);
-
-    initState();
-  };
-
-  return { init };
-})();
-
-// DOM이 준비되면 초기화
-document.addEventListener('DOMContentLoaded', () => {
-  MineChess.init();
-});
-
+  con
